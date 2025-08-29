@@ -1024,6 +1024,7 @@ dependencies = [
  "axum",
  "feed-rs",
  "futures",
+ "regex",
  "reqwest",
  "seahash",
  "serde",

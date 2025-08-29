@@ -96,18 +96,36 @@ function addLog(level, message) {
 
 function addItem(item) {
   const withMeta = { ...item, _arrivalTs: Date.now() };
-  items.value.unshift(withMeta);
   
-  // Sort by published_at desc, fallback to arrival time
+  // Check if this item already exists (avoid duplicates)
+  const existingIndex = items.value.findIndex(existing => existing.id === item.id);
+  if (existingIndex !== -1) {
+    // Update existing item if it's newer
+    const existing = items.value[existingIndex];
+    const existingTime = safeTs(existing.published_at) || existing._arrivalTs || 0;
+    const newTime = safeTs(withMeta.published_at) || withMeta._arrivalTs || 0;
+    
+    if (newTime > existingTime) {
+      items.value[existingIndex] = withMeta;
+    }
+  } else {
+    // Add new item at the beginning
+    items.value.unshift(withMeta);
+  }
+  
+  // Sort by published_at desc (newest first), then by arrival time
   items.value.sort((a, b) => {
-    const ta = Math.max(safeTs(a.published_at), a._arrivalTs || 0);
-    const tb = Math.max(safeTs(b.published_at), b._arrivalTs || 0);
-    return tb - ta;
+    // Use published_at if available and valid, otherwise use arrival time
+    const timeA = safeTs(a.published_at) || a._arrivalTs || 0;
+    const timeB = safeTs(b.published_at) || b._arrivalTs || 0;
+    
+    // Always sort by newest first
+    return timeB - timeA;
   });
   
-  // Keep only last 500 items
-  if (items.value.length > 500) {
-    items.value.length = 500;
+  // Keep only last 1000 items for better performance
+  if (items.value.length > 1000) {
+    items.value.length = 1000;
   }
 }
 
@@ -294,10 +312,6 @@ function onSourcesChanged(newSources) {
   overflow: hidden;
 }
 
-.main-panel.with-logs {
-  /* Adjust layout when logs are visible */
-}
-
 .feed-container {
   flex: 1;
   overflow-y: auto;
@@ -385,10 +399,5 @@ function onSourcesChanged(newSources) {
 .feed-container,
 .logs-panel {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Focus management for better accessibility */
-.app:focus-within .main-content {
-  /* Enhance focus visibility when navigating */
 }
 </style>

@@ -8,6 +8,7 @@ const emit = defineEmits(['update:modelValue', 'changed'])
 const loading = ref(false)
 const list = ref([])
 const showAddForm = ref(false)
+const selectedCategory = ref('all')
 
 const form = ref({
   id: '',
@@ -15,7 +16,107 @@ const form = ref({
   url: '',
   kind: 'rss',
   interval_ms: 60000,
+  category: 'general',
 })
+
+// Predefined crypto RSS feeds for quick addition
+const cryptoPresets = [
+  {
+    name: 'CryptoPanic',
+    url: 'https://cryptopanic.com/news/rss/',
+    category: 'aggregator',
+    interval_ms: 60000
+  },
+  {
+    name: 'CoinDesk',
+    url: 'https://www.coindesk.com/arc/outboundfeeds/rss/',
+    category: 'news',
+    interval_ms: 300000
+  },
+  {
+    name: 'Cointelegraph',
+    url: 'https://cointelegraph.com/rss',
+    category: 'news',
+    interval_ms: 300000
+  },
+  {
+    name: 'The Block',
+    url: 'https://www.theblock.co/rss.xml',
+    category: 'news',
+    interval_ms: 240000
+  },
+  {
+    name: 'Bitcoin Magazine',
+    url: 'https://bitcoinmagazine.com/.rss/full/',
+    category: 'bitcoin',
+    interval_ms: 360000
+  },
+  {
+    name: 'DeFi Pulse',
+    url: 'https://defipulse.com/blog/feed',
+    category: 'defi',
+    interval_ms: 600000
+  },
+  {
+    name: 'Decrypt',
+    url: 'https://decrypt.co/feed',
+    category: 'news',
+    interval_ms: 300000
+  },
+  {
+    name: 'NewsBTC',
+    url: 'https://www.newsbtc.com/feed/',
+    category: 'news',
+    interval_ms: 180000
+  }
+]
+
+const sourceCategories = {
+  all: 'All Sources',
+  news: 'Crypto News',
+  bitcoin: 'Bitcoin Focus',
+  defi: 'DeFi & Web3',
+  trading: 'Trading & Markets',
+  institutional: 'Institutional',
+  aggregator: 'News Aggregators',
+  general: 'General'
+}
+
+const categorizedSources = computed(() => {
+  const sources = list.value || []
+  const categorized = {}
+  
+  Object.keys(sourceCategories).forEach(cat => {
+    if (cat === 'all') return
+    categorized[cat] = sources.filter(source => 
+      getCategoryFromSource(source) === cat
+    )
+  })
+  
+  return categorized
+})
+
+const filteredSources = computed(() => {
+  if (selectedCategory.value === 'all') {
+    return list.value || []
+  }
+  return categorizedSources.value[selectedCategory.value] || []
+})
+
+function getCategoryFromSource(source) {
+  const url = source.url.toLowerCase()
+  const name = source.name.toLowerCase()
+  
+  if (name.includes('bitcoin') || url.includes('bitcoin')) return 'bitcoin'
+  if (name.includes('defi') || url.includes('defi')) return 'defi'
+  if (name.includes('panic') || name.includes('aggregator')) return 'aggregator'
+  if (url.includes('binance') || url.includes('coinbase') || name.includes('trading')) return 'trading'
+  if (name.includes('institutional') || name.includes('grayscale')) return 'institutional'
+  if (name.includes('news') || url.includes('news') || 
+      ['coindesk', 'cointelegraph', 'decrypt', 'theblock'].some(s => url.includes(s))) return 'news'
+  
+  return 'general'
+}
 
 onMounted(load)
 
@@ -42,6 +143,39 @@ function suggestId() {
   form.value.id = base.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 }
 
+function addPreset(preset) {
+  form.value.name = preset.name
+  form.value.url = preset.url
+  form.value.interval_ms = preset.interval_ms
+  form.value.category = preset.category
+  suggestId()
+  showAddForm.value = true
+}
+
+async function addAllCryptoSources() {
+  if (!confirm('Add all recommended crypto RSS sources? This will add 8 high-quality crypto news feeds.')) return
+  
+  try {
+    loading.value = true
+    for (const preset of cryptoPresets) {
+      const src = {
+        id: preset.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+        name: preset.name,
+        url: preset.url,
+        kind: 'rss',
+        interval_ms: preset.interval_ms
+      }
+      await invoke('add_source', { src })
+    }
+    await load()
+    emit('changed', list.value)
+  } catch (e) {
+    console.error('Failed to add crypto sources:', e)
+  } finally {
+    loading.value = false
+  }
+}
+
 async function add() {
   if (!form.value.name?.trim() || !form.value.url?.trim()) return
   
@@ -54,7 +188,7 @@ async function add() {
     await load()
     emit('changed', list.value)
     // Reset form
-    form.value = { id: '', name: '', url: '', kind: 'rss', interval_ms: 60000 }
+    form.value = { id: '', name: '', url: '', kind: 'rss', interval_ms: 60000, category: 'general' }
     showAddForm.value = false
   } catch (e) {
     console.error('Failed to add source:', e)
@@ -144,10 +278,40 @@ function getDomainFromUrl(url) {
         </header>
 
         <div class="modal-content">
+          <!-- Crypto Presets Section -->
+          <div v-if="showAddForm" class="crypto-presets-section animate-fade-in">
+            <div class="presets-header">
+              <h3 class="form-title">🚀 Quick Add Crypto Sources</h3>
+              <p class="form-description">Add proven crypto news sources with one click</p>
+              <button 
+                @click="addAllCryptoSources"
+                class="btn btn-primary btn-sm"
+                :disabled="loading"
+              >
+                Add All Crypto Sources ({{ cryptoPresets.length }})
+              </button>
+            </div>
+            
+            <div class="presets-grid">
+              <div 
+                v-for="preset in cryptoPresets" 
+                :key="preset.name"
+                class="preset-card"
+                @click="addPreset(preset)"
+              >
+                <div class="preset-info">
+                  <h4 class="preset-name">{{ preset.name }}</h4>
+                  <p class="preset-category">{{ sourceCategories[preset.category] }}</p>
+                </div>
+                <div class="preset-interval">{{ formatInterval(preset.interval_ms) }}</div>
+              </div>
+            </div>
+          </div>
+
           <!-- Add Source Form -->
           <div v-if="showAddForm" class="add-form-section animate-fade-in">
             <div class="form-header">
-              <h3 class="form-title">Add New Source</h3>
+              <h3 class="form-title">Add Custom Source</h3>
               <p class="form-description">Enter the details for your RSS feed or news source</p>
             </div>
 
@@ -249,6 +413,19 @@ function getDomainFromUrl(url) {
               </h3>
               
               <div class="section-actions">
+                <!-- Category Filter -->
+                <div class="category-filter">
+                  <select v-model="selectedCategory" class="input input-sm">
+                    <option 
+                      v-for="(label, value) in sourceCategories" 
+                      :key="value" 
+                      :value="value"
+                    >
+                      {{ label }} ({{ value === 'all' ? list.length : (categorizedSources[value] || []).length }})
+                    </option>
+                  </select>
+                </div>
+                
                 <button 
                   class="btn btn-ghost btn-sm"
                   @click="load"
@@ -266,7 +443,7 @@ function getDomainFromUrl(url) {
             </div>
 
             <div class="sources-list">
-              <div v-if="list.length === 0" class="empty-sources">
+              <div v-if="filteredSources.length === 0 && list.length === 0" class="empty-sources">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="empty-icon">
                   <path d="M4 11a9 9 0 0 1 9 9"/>
                   <path d="M4 4a16 16 0 0 1 16 16"/>
@@ -276,14 +453,25 @@ function getDomainFromUrl(url) {
                 <p class="empty-description">Add your first RSS feed to get started</p>
               </div>
 
+              <div v-if="filteredSources.length === 0 && list.length > 0" class="empty-sources">
+                <div class="empty-icon">📂</div>
+                <h4 class="empty-title">No sources in this category</h4>
+                <p class="empty-description">Try selecting a different category or add new sources</p>
+              </div>
+
               <div 
-                v-for="source in list" 
+                v-for="source in filteredSources" 
                 :key="source.id"
                 class="source-item card"
               >
                 <div class="source-main">
                   <div class="source-info">
-                    <h4 class="source-name">{{ source.name }}</h4>
+                    <div class="source-header">
+                      <h4 class="source-name">{{ source.name }}</h4>
+                      <span class="category-badge" :class="`badge-${getCategoryFromSource(source)}`">
+                        {{ sourceCategories[getCategoryFromSource(source)] }}
+                      </span>
+                    </div>
                     <p class="source-url">{{ getDomainFromUrl(source.url) }}</p>
                     <div class="source-meta">
                       <span class="source-id">{{ source.id }}</span>
@@ -661,9 +849,127 @@ function getDomainFromUrl(url) {
   animation: pulse 2s infinite;
 }
 
-/* Focus Management */
-.modal-overlay {
-  /* Trap focus within modal */
+/* Crypto Presets Section */
+.crypto-presets-section {
+  margin-bottom: var(--space-6);
+  padding: var(--space-4);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-light);
+}
+
+.presets-header {
+  margin-bottom: var(--space-4);
+  text-align: center;
+}
+
+.presets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.preset-card {
+  padding: var(--space-3);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.preset-card:hover {
+  background: var(--bg-secondary);
+  border-color: var(--border-medium);
+  transform: translateY(-1px);
+}
+
+.preset-info {
+  flex: 1;
+}
+
+.preset-name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  margin: 0 0 var(--space-1) 0;
+}
+
+.preset-category {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+.preset-interval {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  font-weight: 500;
+  background: var(--bg-tertiary);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+/* Category Filter */
+.category-filter {
+  margin-right: var(--space-2);
+}
+
+.category-filter .input {
+  min-width: 180px;
+}
+
+/* Category Badges */
+.source-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.category-badge {
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+}
+
+.badge-news {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.badge-bitcoin {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.badge-defi {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+
+.badge-trading {
+  background: #e8f5e8;
+  color: #388e3c;
+}
+
+.badge-institutional {
+  background: #fce4ec;
+  color: #c2185b;
+}
+
+.badge-aggregator {
+  background: #f3e5ab;
+  color: #f57f17;
+}
+
+.badge-general {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
 }
 
 /* Scrollbar Styling */

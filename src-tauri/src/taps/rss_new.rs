@@ -24,28 +24,17 @@ impl super::Tap for RssTap {
             name: src.name.clone(),
         };
         
-        let mut items: Vec<NewsItem> = feed
+        let items = feed
             .entries
             .into_iter()
             .map(|e| entry_to_item(&src_info, e))
             .collect();
-            
-        // Sort by published date (newest first) to ensure consistent ordering
-        items.sort_by(|a, b| {
-            match (&b.published_at, &a.published_at) {
-                (Some(b_date), Some(a_date)) => b_date.cmp(a_date),
-                (Some(_), None) => std::cmp::Ordering::Less,
-                (None, Some(_)) => std::cmp::Ordering::Greater,
-                (None, None) => std::cmp::Ordering::Equal,
-            }
-        });
-        
         Ok(items)
     }
 }
 
 fn entry_to_item(source: &SourceInfo, e: Entry) -> NewsItem {
-    let title = e.title.clone().map(|t| t.content).unwrap_or_else(|| "(no title)".into());
+    let title = e.title.map(|t| t.content).unwrap_or_else(|| "(no title)".into());
     let link = e
         .links
         .iter()
@@ -77,7 +66,7 @@ fn entry_to_item(source: &SourceInfo, e: Entry) -> NewsItem {
 }
 
 pub fn entry_to_crypto_item(source: &SourceInfo, e: Entry, source_id: &str) -> NewsItem {
-    let raw_title = e.title.clone().map(|t| t.content).unwrap_or_else(|| "(no title)".into());
+    let raw_title = e.title.map(|t| t.content).unwrap_or_else(|| "(no title)".into());
     let title = super::crypto_feeds::crypto_utils::clean_crypto_title(&raw_title);
     
     let link = e

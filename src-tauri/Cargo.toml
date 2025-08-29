@@ -34,4 +34,5 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 async-trait = "0.1"
 seahash = "4"
+regex = "1.10"
 
