@@ -1,160 +1,394 @@
 <script setup>
-import { ref } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { connectFeed } from "./lib/websocket";
+import HeaderBar from "./components/HeaderBar.vue";
+import Sidebar from "./components/Sidebar.vue";
+import FeedList from "./components/FeedList.vue";
+import LogPanel from "./components/LogPanel.vue";
+import SourceManager from "./components/SourceManager.vue";
 
-const greetMsg = ref("");
-const name = ref("");
+const items = ref([]);
+const sources = ref([]);
+const status = ref("Connecting...");
+const logs = ref([]);
+const showLogs = ref(false);
+const itemCount = ref(0);
+const connected = ref(false);
+const search = ref("");
+const compact = ref(false);
+const activeSources = ref([]);
+const showSourceManager = ref(false);
+const sidebarCollapsed = ref(false);
+const currentView = ref('feed'); // 'feed', 'sources', 'settings'
 
-async function greet() {
-  // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-  greetMsg.value = await invoke("greet", { name: name.value });
+let wsConnection = null;
+
+onMounted(async () => {
+  await loadSources();
+  setupWebSocket();
+});
+
+onUnmounted(() => {
+  if (wsConnection) {
+    wsConnection.close();
+  }
+});
+
+async function loadSources() {
+  try {
+    sources.value = await invoke("list_sources");
+  } catch (e) {
+    addLog("error", "Failed to load sources");
+  }
+}
+
+function setupWebSocket() {
+  if (wsConnection) {
+    wsConnection.close();
+  }
+
+  wsConnection = connectFeed();
+  wsConnection.subscribe((msg) => {
+    handleWebSocketMessage(msg);
+  });
+}
+
+function handleWebSocketMessage(msg) {
+  if (msg.type === "__status__") {
+    if (msg.event === "open") { 
+      connected.value = true; 
+      status.value = "Connected"; 
+      addLog("info", "WebSocket connected");
+    }
+    if (msg.event === "close") { 
+      connected.value = false; 
+      status.value = "Reconnecting..."; 
+      addLog("warn", "WebSocket disconnected");
+    }
+    if (msg.event === "error") { 
+      connected.value = false; 
+      addLog("error", "WebSocket error");
+    }
+  } else if (msg.type === "hello") {
+    status.value = `Connected (v${msg.payload.server_version})`;
+    addLog("info", "Server hello received");
+  } else if (msg.type === "item") {
+    addItem(msg.payload);
+    itemCount.value++;
+    addLog("recv", `New item: ${msg.payload.title?.substring(0, 50)}...`);
+  } else if (msg.type === "heartbeat") {
+    addLog("hb", "Heartbeat");
+  }
+}
+
+function addLog(level, message) {
+  logs.value.unshift({ 
+    ts: Date.now(), 
+    level, 
+    msg: message 
+  });
+  // Keep only last 100 logs
+  if (logs.value.length > 100) {
+    logs.value.length = 100;
+  }
+}
+
+function addItem(item) {
+  const withMeta = { ...item, _arrivalTs: Date.now() };
+  items.value.unshift(withMeta);
+  
+  // Sort by published_at desc, fallback to arrival time
+  items.value.sort((a, b) => {
+    const ta = Math.max(safeTs(a.published_at), a._arrivalTs || 0);
+    const tb = Math.max(safeTs(b.published_at), b._arrivalTs || 0);
+    return tb - ta;
+  });
+  
+  // Keep only last 500 items
+  if (items.value.length > 500) {
+    items.value.length = 500;
+  }
+}
+
+function safeTs(s) {
+  if (!s) return 0;
+  const t = Date.parse(s);
+  return isNaN(t) ? 0 : t;
+}
+
+const filtered = computed(() => {
+  const q = search.value.trim().toLowerCase();
+  const act = activeSources.value;
+  
+  return items.value.filter(item => {
+    const inSource = act.length === 0 || act.includes(item.source?.id);
+    const inText = q.length === 0 || 
+      (item.title?.toLowerCase().includes(q) || 
+       item.summary?.toLowerCase().includes(q));
+    return inSource && inText;
+  });
+});
+
+const countsBySource = computed(() => {
+  const q = search.value.trim().toLowerCase();
+  const map = {};
+  
+  for (const item of items.value) {
+    const inText = q.length === 0 || 
+      (item.title?.toLowerCase().includes(q) || 
+       item.summary?.toLowerCase().includes(q));
+    if (!inText) continue;
+    
+    const id = item.source?.id || 'unknown';
+    map[id] = (map[id] || 0) + 1;
+  }
+  
+  return map;
+});
+
+const totalCountBySearch = computed(() => 
+  Object.values(countsBySource.value).reduce((a, b) => a + b, 0)
+);
+
+async function refreshNow() {
+  try { 
+    await invoke("refresh_now", { id: null }); 
+    addLog("info", "Manual refresh triggered");
+  } catch (e) { 
+    addLog("error", `Refresh failed: ${e}`);
+  }
+}
+
+function toggleSource(id) {
+  const idx = activeSources.value.indexOf(id);
+  if (idx >= 0) {
+    activeSources.value.splice(idx, 1);
+  } else {
+    activeSources.value.push(id);
+  }
+}
+
+function onSourcesChanged(newSources) {
+  sources.value = newSources;
 }
 </script>
 
 <template>
-  <main class="container">
-    <h1>Welcome to Tauri + Vue</h1>
+  <div class="app">
+    <!-- Sidebar Navigation -->
+    <Sidebar 
+      :collapsed="sidebarCollapsed"
+      :current-view="currentView"
+      :sources="sources"
+      :active-sources="activeSources"
+      :counts="countsBySource"
+      :total="totalCountBySearch"
+      @update:collapsed="sidebarCollapsed = $event"
+      @update:view="currentView = $event"
+      @toggle-source="toggleSource"
+      @clear-sources="activeSources = []"
+      @manage-sources="showSourceManager = true"
+    />
 
-    <div class="row">
-      <a href="https://vite.dev" target="_blank">
-        <img src="/vite.svg" class="logo vite" alt="Vite logo" />
-      </a>
-      <a href="https://tauri.app" target="_blank">
-        <img src="/tauri.svg" class="logo tauri" alt="Tauri logo" />
-      </a>
-      <a href="https://vuejs.org/" target="_blank">
-        <img src="./assets/vue.svg" class="logo vue" alt="Vue logo" />
-      </a>
+    <!-- Main Content Area -->
+    <div class="main-content">
+      <!-- Header Bar -->
+      <HeaderBar
+        :connected="connected"
+        :status="status"
+        :search="search"
+        :sources-count="sources.length"
+        :item-count="itemCount"
+        :compact="compact"
+        :show-logs="showLogs"
+        @update:search="search = $event"
+        @update:compact="compact = $event"
+        @update:show-logs="showLogs = $event"
+        @refresh="refreshNow"
+      />
+
+      <!-- Content Area -->
+      <div class="content-area">
+        <div class="main-panel" :class="{ 'with-logs': showLogs }">
+          <!-- Feed Content -->
+          <div class="feed-container">
+            <div v-if="items.length === 0" class="empty-state">
+              <div class="empty-icon">📰</div>
+              <h3 class="empty-title">No items received yet</h3>
+              <p class="empty-description">
+                Waiting for feed updates... Make sure your sources are configured correctly.
+              </p>
+              <div class="empty-actions">
+                <button class="btn btn-primary" @click="refreshNow">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                    <path d="M21 3v5h-5"/>
+                    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                    <path d="M3 21v-5h5"/>
+                  </svg>
+                  Refresh Now
+                </button>
+                <button class="btn btn-secondary" @click="showSourceManager = true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M12 1v6m0 6v6"/>
+                    <path d="m21 12-6 0m-6 0-6 0"/>
+                  </svg>
+                  Manage Sources
+                </button>
+              </div>
+            </div>
+            
+            <FeedList 
+              v-else 
+              :items="filtered" 
+              :compact="compact"
+              class="animate-fade-in" 
+            />
+          </div>
+
+          <!-- Logs Panel -->
+          <LogPanel 
+            v-if="showLogs" 
+            :logs="logs" 
+            class="logs-panel" 
+          />
+        </div>
+      </div>
     </div>
-    <p>Click on the Tauri, Vite, and Vue logos to learn more.</p>
 
-    <form class="row" @submit.prevent="greet">
-      <input id="greet-input" v-model="name" placeholder="Enter a name..." />
-      <button type="submit">Greet</button>
-    </form>
-    <p>{{ greetMsg }}</p>
-  </main>
+    <!-- Modals -->
+    <SourceManager 
+      v-model="showSourceManager" 
+      @changed="onSourcesChanged" 
+    />
+  </div>
 </template>
 
 <style scoped>
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
+.app {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background: var(--bg-primary);
 }
 
-.logo.vue:hover {
-  filter: drop-shadow(0 0 2em #249b73);
-}
-
-</style>
-<style>
-:root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 400;
-
-  color: #0f0f0f;
-  background-color: #f6f6f6;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
-}
-
-.container {
-  margin: 0;
-  padding-top: 10vh;
+.main-content {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  text-align: center;
+  overflow: hidden;
+  margin-left: 240px;
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: 0.75s;
+.content-area {
+  flex: 1;
+  overflow: hidden;
 }
 
-.logo.tauri:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
-}
-
-.row {
+.main-panel {
   display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+
+.main-panel.with-logs {
+  /* Adjust layout when logs are visible */
+}
+
+.feed-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-6);
+  background: var(--bg-primary);
+}
+
+.logs-panel {
+  width: 350px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border-light);
+  background: var(--bg-secondary);
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+  text-align: center;
+  padding: var(--space-8);
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: var(--space-4);
+  opacity: 0.6;
+}
+
+.empty-title {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.empty-description {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  max-width: 400px;
+  line-height: 1.6;
+  margin-bottom: var(--space-6);
+}
+
+.empty-actions {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
   justify-content: center;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-
-a:hover {
-  color: #535bf2;
-}
-
-h1 {
-  text-align: center;
-}
-
-input,
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  color: #0f0f0f;
-  background-color: #ffffff;
-  transition: border-color 0.25s;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
-}
-
-button {
-  cursor: pointer;
-}
-
-button:hover {
-  border-color: #396cd8;
-}
-button:active {
-  border-color: #396cd8;
-  background-color: #e8e8e8;
-}
-
-input,
-button {
-  outline: none;
-}
-
-#greet-input {
-  margin-right: 5px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f6f6f6;
-    background-color: #2f2f2f;
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .main-content {
+    margin-left: 0;
   }
-
-  a:hover {
-    color: #24c8db;
+  
+  .main-panel.with-logs {
+    flex-direction: column;
   }
-
-  input,
-  button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
+  
+  .logs-panel {
+    width: 100%;
+    height: 250px;
+    border-left: none;
+    border-top: 1px solid var(--border-light);
   }
-  button:active {
-    background-color: #0f0f0f69;
+  
+  .feed-container {
+    padding: var(--space-4);
+  }
+  
+  .empty-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .empty-actions .btn {
+    min-width: 200px;
   }
 }
 
+/* Smooth transitions for layout changes */
+.feed-container,
+.logs-panel {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Focus management for better accessibility */
+.app:focus-within .main-content {
+  /* Enhance focus visibility when navigating */
+}
 </style>
