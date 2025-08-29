@@ -31,6 +31,27 @@ function getDomainFromUrl(url) {
     return url;
   }
 }
+
+function openLink(url) {
+  if (url) {
+    // Use window.open which works reliably in Tauri
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+}
+
+function shareItem(item) {
+  if (navigator.share && item.link) {
+    navigator.share({
+      title: item.title,
+      url: item.link
+    }).catch(console.warn);
+  } else if (item.link) {
+    // Fallback: copy to clipboard
+    navigator.clipboard.writeText(item.link).then(() => {
+      console.log('Link copied to clipboard');
+    }).catch(console.warn);
+  }
+}
 </script>
 
 <template>
@@ -39,11 +60,12 @@ function getDomainFromUrl(url) {
       <article 
         v-for="item in items" 
         :key="item.id" 
-        class="feed-item card card-interactive"
+        class="feed-item card"
         :class="{ 
           'card-fresh': isRecentItem(item),
           'compact': compact
         }"
+        role="article"
       >
         <!-- Item Header -->
         <div class="item-header">
@@ -59,7 +81,7 @@ function getDomainFromUrl(url) {
           <div class="item-actions">
             <button 
               class="btn btn-ghost btn-sm"
-              @click.prevent="$event.stopPropagation()"
+              @click.stop="shareItem(item)"
               title="Share"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -79,7 +101,6 @@ function getDomainFromUrl(url) {
               target="_blank" 
               rel="noopener noreferrer"
               class="title-link"
-              @click.stop
             >
               {{ item.title }}
             </a>
@@ -129,6 +150,11 @@ function getDomainFromUrl(url) {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
+}
+
+.feed-item:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
 }
 
 .feed-item.compact {
@@ -214,16 +240,12 @@ function getDomainFromUrl(url) {
   margin: 0 0 var(--space-2) 0;
 }
 
-.feed-item.compact .item-title {
-  font-size: var(--text-sm);
-  margin-bottom: var(--space-1);
-}
-
 .title-link {
   color: var(--text-primary);
   text-decoration: none;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   transition: color 0.2s ease;
@@ -234,12 +256,18 @@ function getDomainFromUrl(url) {
   text-decoration: none;
 }
 
+.feed-item.compact .item-title {
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-1);
+}
+
 .item-summary {
   font-size: var(--text-sm);
   line-height: 1.5;
   margin: 0;
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   opacity: 0.9;
