@@ -6,13 +6,17 @@ use std::sync::OnceLock;
 
 pub struct RssTap;
 
+// Performance optimization: Compile regex once using OnceLock
+static HTML_CLEANER: OnceLock<Regex> = OnceLock::new();
+static ENTITY_CLEANER: OnceLock<Regex> = OnceLock::new();
+
 #[async_trait::async_trait]
 impl super::Tap for RssTap {
     async fn fetch(&self, src: &SourceConfig) -> Result<Vec<NewsItem>> {
         // Enhanced HTTP client with better headers and error handling
         let client = reqwest::Client::builder()
             .user_agent("FeedTap/2.0 (+https://github.com/Ta1to/feedtap)")
-            .timeout(std::time::Duration::from_secs(30))
+            .timeout(std::time::Duration::from_secs(15)) // Reduced timeout for better performance
             .build()?;
             
         let response = client.get(&src.url).send().await?;

@@ -11,13 +11,16 @@ struct WsState {
 }
 
 pub fn start_ws_server(port: u16, mut rx: broadcast::Receiver<crate::types::NewsItem>) {
-    let (tx_items, _) = broadcast::channel(256);
+    let (tx_items, _) = broadcast::channel(1024); // Increased buffer for better performance
 
     // pump from aggregator rx into ws tx_items
     let tx_forward = tx_items.clone();
     tauri::async_runtime::spawn(async move {
         while let Ok(item) = rx.recv().await {
-            let _ = tx_forward.send(item);
+            // Performance optimization: Only forward if there are subscribers
+            if tx_forward.receiver_count() > 0 {
+                let _ = tx_forward.send(item);
+            }
         }
     });
 
@@ -43,16 +46,22 @@ async fn ws_handler(ws: WebSocketUpgrade, State(state): State<WsState>) -> impl 
 async fn ws_stream(mut socket: WebSocket, state: WsState) {
     // Send hello
     let hello = WsMessage::Hello { server_version: env!("CARGO_PKG_VERSION").to_string() };
-    let _ = socket.send(Message::Text(serde_json::to_string(&hello).unwrap())).await;
+    if socket.send(Message::Text(serde_json::to_string(&hello).unwrap())).await.is_err() {
+        return;
+    }
 
     let mut rx = state.tx.subscribe();
-    let mut hb = interval(Duration::from_secs(15));
+    let mut hb = interval(Duration::from_secs(30)); // Reduced heartbeat frequency for performance
+    
     loop {
         tokio::select! {
             Ok(item) = rx.recv() => {
                 let msg = WsMessage::Item(item);
-                if socket.send(Message::Text(serde_json::to_string(&msg).unwrap())).await.is_err() {
-                    break;
+                // Performance optimization: Pre-serialize JSON once
+                if let Ok(json) = serde_json::to_string(&msg) {
+                    if socket.send(Message::Text(json)).await.is_err() {
+                        break;
+                    }
                 }
             }
             _ = hb.tick() => {

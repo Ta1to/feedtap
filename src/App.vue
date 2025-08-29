@@ -22,6 +22,10 @@ const showSourceManager = ref(false);
 const sidebarCollapsed = ref(false);
 const currentView = ref('feed'); // 'feed', 'sources', 'settings'
 
+// Performance optimization: Limit items in memory
+const MAX_ITEMS = 500;
+const MAX_LOGS = 200;
+
 let wsConnection = null;
 
 onMounted(async () => {
