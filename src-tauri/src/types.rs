@@ -31,10 +31,18 @@ pub struct NewsItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LogMessage {
+    pub level: String,
+    pub message: String,
+    pub timestamp: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "payload", rename_all = "lowercase")]
 pub enum WsMessage {
     Hello { server_version: String },
     Item(NewsItem),
+    Log(LogMessage),
     Heartbeat,
     Error { message: String },
 }

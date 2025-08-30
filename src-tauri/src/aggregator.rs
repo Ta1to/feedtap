@@ -139,8 +139,19 @@ async fn poll_once(inner: Arc<Inner>, src: SourceConfig) -> Result<()> {
             }
             
             // Send the item
-            if inner.tx.send(item).is_ok() {
+            if inner.tx.send(item.clone()).is_ok() {
                 new_items += 1;
+                tracing::debug!(
+                    item_id = %item.id,
+                    source_id = %src.id,
+                    "News item added to broadcast channel"
+                );
+            } else {
+                tracing::warn!(
+                    item_id = %item.id,
+                    source_id = %src.id,
+                    "Failed to send news item to broadcast channel"
+                );
             }
         }
     }

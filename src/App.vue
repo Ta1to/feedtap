@@ -80,7 +80,10 @@ function handleWebSocketMessage(msg) {
   } else if (msg.type === "item") {
     addItem(msg.payload);
     itemCount.value++;
-    addLog("recv", `New item: ${msg.payload.title?.substring(0, 50)}...`);
+    addLog("recv", `New item received: ${msg.payload.title?.substring(0, 50)}...`);
+  } else if (msg.type === "log") {
+    // Handle server-side log messages
+    addLog(msg.payload.level, msg.payload.message);
   } else if (msg.type === "heartbeat") {
     addLog("hb", "Heartbeat");
   }

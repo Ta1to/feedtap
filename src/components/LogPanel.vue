@@ -15,6 +15,7 @@ onUpdated(() => {
 const logLevels = {
   hb: { label: 'HB', color: 'var(--text-tertiary)', icon: '💓' },
   recv: { label: 'RECV', color: 'var(--accent-primary)', icon: '📨' },
+  sent: { label: 'SENT', color: 'var(--accent-secondary)', icon: '📤' },
   info: { label: 'INFO', color: 'var(--accent-success)', icon: 'ℹ️' },
   warn: { label: 'WARN', color: 'var(--accent-warning)', icon: '⚠️' },
   error: { label: 'ERROR', color: 'var(--accent-danger)', icon: '❌' }
@@ -245,6 +246,11 @@ function clearLogs() {
 .log-recv {
   /* Fresh received items get subtle highlight */
   background: rgba(0, 122, 255, 0.02);
+}
+
+.log-sent {
+  /* Sent items get subtle highlight */
+  background: rgba(52, 199, 89, 0.02);
 }
 
 .log-error {
