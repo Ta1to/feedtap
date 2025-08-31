@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, reactive } from 'vue';
 
 const props = defineProps({ 
   items: Array, 
@@ -50,6 +50,31 @@ function shareItem(item) {
     navigator.clipboard.writeText(item.link).then(() => {
       console.log('Link copied to clipboard');
     }).catch(console.warn);
+  }
+}
+
+// Preview state and loader
+const previews = reactive({}); // id -> { loading, error, html, open }
+
+async function togglePreview(item) {
+  const cur = previews[item.id];
+  if (cur && cur.html && !cur.open) {
+    previews[item.id] = { ...cur, open: true };
+    return;
+  }
+  if (cur && cur.open) {
+    previews[item.id] = { ...cur, open: false };
+    return;
+  }
+  previews[item.id] = { loading: true, error: null, html: '', open: true };
+  try {
+    const resp = await fetch(`http://127.0.0.1:8787/preview?url=${encodeURIComponent(item.link)}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    // content_preview may be html; render as text fallback
+    previews[item.id] = { loading: false, error: null, html: data.content_preview, open: true };
+  } catch (e) {
+    previews[item.id] = { loading: false, error: String(e), html: '', open: true };
   }
 }
 </script>
@@ -109,6 +134,18 @@ function shareItem(item) {
           <p v-if="item.summary && !compact" class="item-summary text-secondary">
             {{ item.summary }}
           </p>
+          <div class="preview-controls" v-if="!compact">
+            <button class="btn btn-outline btn-xs" @click.prevent="togglePreview(item)">
+              {{ (previews[item.id]?.open) ? 'Hide preview' : 'Show preview' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Preview Panel -->
+        <div v-if="previews[item.id]?.open && !compact" class="preview-panel">
+          <div v-if="previews[item.id]?.loading" class="preview-loading text-tertiary">Loading preview…</div>
+          <div v-else-if="previews[item.id]?.error" class="preview-error text-danger">{{ previews[item.id]?.error }}</div>
+          <div v-else class="preview-content" v-html="previews[item.id]?.html"></div>
         </div>
 
         <!-- Footer with external link info -->
@@ -271,6 +308,23 @@ function shareItem(item) {
   -webkit-box-orient: vertical;
   overflow: hidden;
   opacity: 0.9;
+}
+
+.preview-controls {
+  margin-top: var(--space-2);
+}
+
+.preview-panel {
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface-muted);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-light);
+}
+
+.preview-content {
+  font-size: var(--text-sm);
+  line-height: 1.6;
 }
 
 /* Footer */

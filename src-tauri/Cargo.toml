@@ -36,3 +36,10 @@ async-trait = "0.1"
 seahash = "4"
 regex = "1.10"
 
+# Added for article preview endpoint and helpers
+scraper = "0.18"
+ammonia = "4"
+moka = { version = "0.12", features = ["future"] }
+tower-http = { version = "0.5", features = ["cors"] }
+url = "2.5"
+
