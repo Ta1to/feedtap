@@ -222,10 +222,35 @@ async fn http_preview(Query(q): Query<PreviewQuery>, State(state): State<WsState
 
     // Try extract main content
     let extracted = extract_main_content(html);
+    
+    // If extraction failed or returned script content, try to get meta description
+    let final_content = if extracted.is_empty() || contains_script_content(&extracted) {
+        let doc = scraper::Html::parse_document(html);
+        if let Ok(meta_sel) = scraper::Selector::parse("meta[name=description], meta[property='og:description']") {
+            if let Some(meta) = doc.select(&meta_sel).next() {
+                if let Some(content) = meta.value().attr("content") {
+                    if content.len() > 30 {
+                        content.to_string()
+                    } else {
+                        "Preview not available for this content.".to_string()
+                    }
+                } else {
+                    "Preview not available for this content.".to_string()
+                }
+            } else {
+                "Preview not available for this content.".to_string()
+            }
+        } else {
+            "Preview not available for this content.".to_string()
+        }
+    } else {
+        extracted
+    };
+
     let sanitized = ammonia::Builder::default()
         .add_tags(["p", "a", "strong", "em", "ul", "ol", "li", "blockquote", "h3", "h4"].into_iter())
         .url_relative(ammonia::UrlRelative::Deny)
-        .clean(&extracted)
+        .clean(&final_content)
         .to_string();
 
     // Truncate to a safe size
@@ -240,39 +265,105 @@ async fn http_preview(Query(q): Query<PreviewQuery>, State(state): State<WsState
 }
 
 fn extract_main_content(html: &str) -> String {
-    // 1) Prefer <article> or role=main
     let doc = scraper::Html::parse_document(html);
-    let sel_article = scraper::Selector::parse("article").unwrap();
-    let sel_main = scraper::Selector::parse("main, [role=main], .article, .post, .content").unwrap();
+    
+    // Special handling for CryptoPanic pages - look for the actual article content or source link
+    if html.contains("cryptopanic.com") {
+        // Try to find the news summary/description in CryptoPanic's structure
+        let cp_selectors = [
+            ".news-summary",
+            ".post-content", 
+            ".news-description",
+            "[data-news-summary]",
+            ".article-content"
+        ];
+        
+        for selector_str in &cp_selectors {
+            if let Ok(sel) = scraper::Selector::parse(selector_str) {
+                for node in doc.select(&sel) {
+                    let text = extract_node_text(node);
+                    if text.len() > 100 && !text.contains("window.App") && !text.contains("OneSignal") {
+                        return text;
+                    }
+                }
+            }
+        }
+        
+        // Look for meta description as fallback for CryptoPanic
+        if let Ok(meta_sel) = scraper::Selector::parse("meta[name=description]") {
+            if let Some(meta) = doc.select(&meta_sel).next() {
+                if let Some(content) = meta.value().attr("description") {
+                    if content.len() > 50 {
+                        return content.to_string();
+                    }
+                }
+            }
+        }
+    }
 
-    let extract_text = |node: scraper::ElementRef| -> String {
-        let mut out = String::new();
-        for child in node.text() {
-            out.push_str(child);
+    // Standard content extraction for other sites
+    let content_selectors = [
+        "article",
+        "main", 
+        "[role=main]",
+        ".article",
+        ".post",
+        ".content",
+        ".entry-content",
+        ".post-content"
+    ];
+    
+    for selector_str in &content_selectors {
+        if let Ok(sel) = scraper::Selector::parse(selector_str) {
+            for node in doc.select(&sel) {
+                let text = extract_node_text(node);
+                if text.len() > 200 && !contains_script_content(&text) {
+                    return text;
+                }
+            }
+        }
+    }
+    
+    // Fallback: body text, but filter out script content
+    if let Ok(sel_body) = scraper::Selector::parse("body") {
+        if let Some(body) = doc.select(&sel_body).next() {
+            let text = extract_node_text(body);
+            if !text.is_empty() && !contains_script_content(&text) {
+                return text;
+            }
+        }
+    }
+    
+    // Last resort: strip tags naively
+    let cleaned = naive_strip_html(html);
+    if contains_script_content(&cleaned) {
+        "Content could not be extracted properly.".to_string()
+    } else {
+        cleaned
+    }
+}
+
+fn extract_node_text(node: scraper::ElementRef) -> String {
+    let mut out = String::new();
+    for child in node.text() {
+        let text = child.trim();
+        if !text.is_empty() {
+            out.push_str(text);
             out.push(' ');
         }
-        let s = out.trim().to_string();
-        if s.len() > 20 { s } else { String::new() }
-    };
+    }
+    out.trim().to_string()
+}
 
-    // Try article nodes
-    for node in doc.select(&sel_article) {
-        let t = extract_text(node);
-        if t.len() > 200 { return t; }
-    }
-    // Try main/content nodes
-    for node in doc.select(&sel_main) {
-        let t = extract_text(node);
-        if t.len() > 200 { return t; }
-    }
-    // Fallback: body text
-    let sel_body = scraper::Selector::parse("body").unwrap();
-    if let Some(body) = doc.select(&sel_body).next() {
-        let t = extract_text(body);
-        if !t.is_empty() { return t; }
-    }
-    // Last resort: strip tags naively
-    naive_strip_html(html)
+fn contains_script_content(text: &str) -> bool {
+    text.contains("window.App") || 
+    text.contains("OneSignal") || 
+    text.contains("VueComponents") ||
+    text.contains("javascript:") ||
+    text.contains("var ") ||
+    text.contains("function(") ||
+    text.contains("jQuery") ||
+    text.len() < 50  // Too short to be meaningful content
 }
 
 fn naive_strip_html(html: &str) -> String {
