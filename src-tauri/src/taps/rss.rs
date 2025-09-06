@@ -6,10 +6,6 @@ use std::sync::OnceLock;
 
 pub struct RssTap;
 
-// Performance optimization: Compile regex once using OnceLock
-static HTML_CLEANER: OnceLock<Regex> = OnceLock::new();
-static ENTITY_CLEANER: OnceLock<Regex> = OnceLock::new();
-
 #[async_trait::async_trait]
 impl super::Tap for RssTap {
     async fn fetch(&self, src: &SourceConfig) -> Result<Vec<NewsItem>> {

@@ -106,38 +106,6 @@ pub mod crypto_utils {
     use regex::Regex;
     use std::sync::OnceLock;
 
-    pub fn extract_crypto_keywords(text: &str) -> Vec<String> {
-        static CRYPTO_REGEX: OnceLock<Regex> = OnceLock::new();
-        
-        let regex = CRYPTO_REGEX.get_or_init(|| {
-            Regex::new(r"(?i)\b(bitcoin|btc|ethereum|eth|crypto|blockchain|defi|nft|altcoin|stablecoin|mining|trading|hodl|bull|bear|market|price|pump|dump|moon|dip|correction|rally)\b").unwrap()
-        });
-
-        regex.find_iter(text)
-            .map(|m| m.as_str().to_lowercase())
-            .collect()
-    }
-
-    pub fn calculate_crypto_relevance_score(title: &str, summary: Option<&str>) -> u32 {
-        let combined_text = format!("{} {}", title, summary.unwrap_or(""));
-        let keywords = extract_crypto_keywords(&combined_text);
-        
-        // Weight different keyword types
-        let mut score = 0u32;
-        for keyword in keywords {
-            score += match keyword.as_str() {
-                "bitcoin" | "btc" | "ethereum" | "eth" => 5,
-                "crypto" | "blockchain" | "defi" => 4,
-                "trading" | "market" | "price" => 3,
-                "nft" | "altcoin" | "mining" => 3,
-                "bull" | "bear" | "pump" | "dump" => 2,
-                _ => 1,
-            };
-        }
-
-        score
-    }
-
     pub fn clean_crypto_title(title: &str) -> String {
         // Remove common prefixes/suffixes from crypto news titles
         let binding = title
