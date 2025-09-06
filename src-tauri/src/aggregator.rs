@@ -20,18 +20,18 @@ struct Inner {
     tx: broadcast::Sender<NewsItem>,
     // Performance optimized: VecDeque with size limit instead of growing HashSet
     seen: Arc<Mutex<HashMap<String, VecDeque<String>>>>,
-    storage: Arc<Mutex<Storage>>,
+    storage: Storage,
     last_poll: Arc<Mutex<HashMap<String, Instant>>>,
 }
 
 pub struct Aggregator;
 
 impl Aggregator {
-    pub fn start(storage: Arc<Mutex<Storage>>) -> (AggregatorHandle, broadcast::Receiver<NewsItem>) {
+    pub fn start(storage: Storage) -> (AggregatorHandle, broadcast::Receiver<NewsItem>) {
         let (tx, rx) = broadcast::channel(512); // Increased buffer for better performance
         let seen = Arc::new(Mutex::new(HashMap::<String, VecDeque<String>>::new()));
         let last_poll = Arc::new(Mutex::new(HashMap::<String, Instant>::new()));
-        let inner = Arc::new(Inner { tx: tx.clone(), seen: seen.clone(), storage: storage.clone(), last_poll: last_poll.clone() });
+        let inner = Arc::new(Inner { tx: tx.clone(), seen: seen.clone(), storage, last_poll: last_poll.clone() });
         let handle = AggregatorHandle { inner: inner.clone() };
 
         // Optimized scheduler loop - batch processing and pre-filtering
@@ -40,8 +40,7 @@ impl Aggregator {
             loop {
                 let now = Instant::now();
                 let sources = {
-                    let st = inner_clone.storage.lock().await;
-                    st.list_sources().await
+                    inner_clone.storage.list_sources()
                 };
 
                 // Pre-filter sources that need polling to reduce spawned tasks
@@ -98,8 +97,7 @@ impl Aggregator {
 impl AggregatorHandle {
     pub async fn trigger_refresh(&self, id: Option<String>) -> Result<()> {
         let sources = {
-            let st = self.inner.storage.lock().await;
-            let list = st.list_sources().await;
+            let list = self.inner.storage.list_sources();
             if let Some(id) = id {
                 list.into_iter().filter(|s| s.id == id).collect()
             } else {

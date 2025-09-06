@@ -1,115 +1,132 @@
-# FeedTap 2.0 🚀
+# FeedTap
 
-A modern Tauri + Vue desktop application that provides a live RSS feed reader with real-time updates via WebSocket streaming.
+A modern desktop RSS feed reader built with Tauri and Vue that provides real-time feed updates with a clean, professional interface.
 
-## ✨ Features
+## What is FeedTap?
 
-### 🎨 **Modern UI/UX Design**
-- **Sleek sidebar navigation** with collapsible panels
-- **Smart source filtering** with real-time counters  
-- **Modern card-based feed layout** with smooth animations
-- **Professional activity logs panel** with color-coded events
-- **Responsive design** that works on all screen sizes
-- **Dark/Light theme** with system preference detection
-- **Glassmorphism effects** with backdrop blur
-- **Micro-interactions** for enhanced user experience
+FeedTap is a desktop application designed for staying up-to-date with your favorite news sources and blogs. It aggregates RSS and Atom feeds from multiple sources and presents them in a unified, real-time stream. Perfect for cryptocurrency news, tech blogs, journalism, and any RSS-compatible content.
 
-### ⚡ **Core Functionality**
-- **Real-time feed updates** via local WebSocket (ws://127.0.0.1:8787/stream)
-- **Configurable RSS/Atom sources** with custom intervals
-- **Smart deduplication** of feed items
-- **Search functionality** across titles and summaries
-- **Compact/comfortable view modes**
-- **Live connection status** indicator
-- **Fresh item highlighting** for new articles
+**Key Benefits:**
+- **Real-time updates** - See new articles as they're published
+- **Unified interface** - All your feeds in one place
+- **Desktop native** - Fast, responsive, and works offline
+- **Privacy-focused** - Everything runs locally on your machine
+- **Customizable** - Add any RSS/Atom feed and configure update intervals
 
-### 🛠️ **Technical Excellence**
-- Built with **Tauri 2.0** + **Vue 3** + **Vite**
-- **Modern CSS** with CSS custom properties and modern layout
-- **TypeScript-ready** architecture
-- **Accessibility-focused** with proper ARIA labels and keyboard navigation
-- **Performance-optimized** with efficient rendering and memory management
+## Features
 
-## 🎯 User Experience Improvements
+### Core Functionality
+- **Live feed aggregation** from multiple RSS/Atom sources
+- **Real-time WebSocket updates** for instant article notifications
+- **Smart deduplication** prevents duplicate articles
+- **Full-text preview** for articles (click "Show preview" on any item)
+- **Configurable polling intervals** per source
+- **Search across all articles** by title and content
+- **Source filtering** to focus on specific publications
 
-### Before (v1.0):
-- Basic functional interface
-- Cluttered header with too many controls
-- Simple list layout without visual hierarchy
-- Basic logs display
-- No source organization
-- Limited visual feedback
+### User Interface
+- **Modern sidebar navigation** with collapsible panels
+- **Card-based article layout** with rich metadata
+- **Compact and comfortable view modes**
+- **Live activity logs** showing system status
+- **Dark and light themes** with system preference detection
+- **Smooth animations** and responsive design
+- **Professional typography** and consistent spacing
 
-### After (v2.0):
-- **Sidebar-first navigation** similar to modern apps (Discord, Notion, Linear)
-- **Clean header** focused on search and essential actions
-- **Card-based feed** with rich metadata and visual cues
-- **Professional logs panel** with categorized, color-coded entries
-- **Smart source management** with grouping and filtering
-- **Rich visual feedback** with animations and state indicators
-- **Empty states** with helpful guidance
-- **Loading states** and error handling
+### Technical Features
+- **Desktop application** built with Tauri (Rust + Web technologies)
+- **Vue 3 frontend** with modern JavaScript
+- **Local WebSocket server** for real-time communication
+- **Persistent storage** for source configurations
+- **Automatic background updates** with efficient polling
+- **Cross-platform** support (Windows, macOS, Linux)
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
-- **Node.js** (v18 or higher)
-- **Rust toolchain** (latest stable)
-- **Windows/macOS/Linux** desktop environment
+- Node.js (v18 or higher)
+- Rust toolchain (latest stable)
+- Windows, macOS, or Linux desktop environment
 
-### Development Setup
-```powershell
-# Clone and install dependencies
+### Installation
+```bash
+# Clone the repository
 git clone <repository-url>
 cd feedtap
+
+# Install dependencies
 npm install
 
-# Start development server with hot-reload
+# Start development server
 npm run tauri dev
 ```
 
 The application will start with:
-- **Frontend**: Vite dev server at http://localhost:1420
-- **Backend**: Tauri app with WebSocket server on port 8787
-- **Hot reload**: Both frontend and backend changes trigger automatic reloads
+- Frontend development server at http://localhost:1420
+- Backend Tauri app with WebSocket server on port 8787
+- Hot reload for both frontend and backend changes
 
-### Production Build
-```powershell
+### Building for Production
+```bash
 npm run tauri build
 ```
 
-## 🎮 Usage Guide
+## Usage Guide
 
-### 📱 **Navigation**
-- **Sidebar**: Navigate between Feed, Sources, and Settings
-- **Collapse/Expand**: Click the toggle button in the sidebar header
-- **Source Filtering**: Click on any source in the sidebar to filter articles
-- **Search**: Use the global search in the header (⌘K shortcut)
+### Getting Started
+1. **Launch FeedTap** - The app starts with several cryptocurrency news sources pre-configured
+2. **Browse articles** - New articles appear automatically in the main feed
+3. **Preview content** - Click "Show preview" under any article to see the full text
+4. **Add sources** - Click "Manage Sources" to add your own RSS feeds
+5. **Filter by source** - Click any source name in the sidebar to filter articles
 
-### 📰 **Managing Feeds**
-1. Click **"Manage Sources"** in sidebar or header actions
-2. Click **"Add Source"** to configure a new RSS feed
-3. Enter source details (name, URL, update interval)
-4. Sources are automatically saved and begin polling immediately
+### Managing Feed Sources
+- Click **"Manage Sources"** in the sidebar or header
+- Add new RSS/Atom feeds with custom names and update intervals
+- Remove sources you no longer need
+- Adjust polling frequency per source (from 1 minute to several hours)
 
-### 🔧 **View Options**
-- **Compact Mode**: Dense list view for more articles per screen
-- **Comfortable Mode**: Spacious cards with full summaries
-- **Activity Logs**: Toggle to view real-time system activity
-- **Auto-refresh**: Sources update automatically based on their intervals
+### Navigation and Views
+- **Sidebar navigation** - Switch between feed view and source management
+- **Search functionality** - Use the search bar to find specific articles
+- **Compact mode** - Toggle for a denser article list
+- **Activity logs** - View real-time system activity and feed updates
 
-## 📡 WebSocket API
+## Architecture Overview
 
-The application exposes a local WebSocket server for real-time feed updates:
+FeedTap is built with modern web technologies wrapped in a native desktop application:
+
+### Frontend (Vue 3 + Vite)
+- **Vue 3 Composition API** for reactive user interface
+- **Modern CSS** with custom properties and responsive design
+- **WebSocket client** for real-time feed updates
+- **Component-based architecture** for maintainable code
+
+### Backend (Rust + Tauri)
+- **Tauri framework** for native desktop integration
+- **RSS/Atom feed parsing** with multiple source support
+- **WebSocket server** for real-time communication
+- **Background polling** with configurable intervals
+- **Local data storage** for source configurations
+
+### Key Components
+- **Feed Aggregator** - Polls RSS sources and deduplicates articles
+- **WebSocket Server** - Broadcasts new articles to the frontend
+- **Article Preview** - Fetches and sanitizes full article content
+- **Source Manager** - Handles RSS feed configuration and storage
+
+## WebSocket API
+
+The application runs a local WebSocket server for real-time updates:
 
 **Connection**: `ws://127.0.0.1:8787/stream`
 
 ### Message Types
 ```json
-// Server greeting
+// Server hello message
 { "type": "hello", "payload": { "server_version": "0.1.0" } }
 
-// New feed item
+// New article
 { 
   "type": "item", 
   "payload": {
@@ -122,60 +139,118 @@ The application exposes a local WebSocket server for real-time feed updates:
   }
 }
 
-// Server heartbeat (every 15s)
-{ "type": "heartbeat" }
+// Activity log
+{ 
+  "type": "log", 
+  "payload": {
+    "level": "info",
+    "message": "Fetched 5 new articles from TechCrunch",
+    "timestamp": 1640995200000
+  }
+}
 
-// Error notification
-{ "type": "error", "payload": { "message": "Error description" } }
+// Heartbeat (every 30 seconds)
+{ "type": "heartbeat" }
 ```
 
-## 🛠️ Development Architecture
+## Preview API
 
-### Frontend (Vue 3 + Vite)
-- **`src/App.vue`**: Main application shell with layout management
-- **`src/components/`**: Modular UI components
-  - `Sidebar.vue`: Navigation and source filtering
-  - `HeaderBar.vue`: Search and global actions
-  - `FeedList.vue`: Article display with animations
-  - `LogPanel.vue`: Real-time activity monitoring
-  - `SourceManager.vue`: Feed configuration modal
-- **`src/assets/theme.css`**: Modern design system with CSS custom properties
-- **`src/lib/websocket.js`**: WebSocket client with reconnection logic
+FeedTap includes an HTTP endpoint for fetching article previews:
 
-### Backend (Rust + Tauri)
-- **`src-tauri/src/lib.rs`**: Application entry point and Tauri commands
-- **`src-tauri/src/aggregator.rs`**: RSS feed polling and deduplication engine
-- **`src-tauri/src/ws.rs`**: WebSocket server for real-time updates
-- **`src-tauri/src/storage.rs`**: Persistent source configuration
-- **`src-tauri/src/taps/`**: Pluggable feed parsers (RSS/Atom)
-- **`src-tauri/src/types.rs`**: Shared data structures
+**Endpoint**: `GET http://127.0.0.1:8787/preview?url=<article-url>`
 
-### Design System
-- **CSS Custom Properties**: Consistent theming with light/dark mode
-- **Typography Scale**: Harmonious font sizing and spacing
-- **Color Palette**: Carefully selected colors for accessibility
-- **Component Library**: Reusable UI elements (buttons, cards, badges)
-- **Animation System**: Smooth transitions and micro-interactions
-- **Responsive Breakpoints**: Mobile-first responsive design
-
-## 🔌 Extending FeedTap
-
-### Adding New Feed Types
-1. Create a new parser in `src-tauri/src/taps/`
-2. Implement the `Tap` trait with custom fetch logic
-3. Register the new type in `make_tap()` function
-4. Update the UI dropdown in `SourceManager.vue`
-
-### Custom Styling
-The design system uses CSS custom properties for easy theming:
-```css
-:root {
-  --accent-primary: #007aff;    /* Change primary color */
-  --bg-primary: #fafafa;        /* Adjust background */
-  --text-primary: #1d1d1f;      /* Modify text color */
-  /* ... see src/assets/theme.css for all variables */
+**Response**:
+```json
+{
+  "url": "https://example.com/article",
+  "content_preview": "Sanitized article content..."
 }
 ```
 
-## 📝 License
-MIT License - see LICENSE file for details
+This endpoint:
+- Fetches the full article content
+- Extracts the main text content
+- Sanitizes HTML and removes scripts
+- Caches results for performance
+- Handles CryptoPanic and other aggregator sites
+
+## Extending FeedTap
+
+### Adding Custom Feed Sources
+1. Open the application and click "Manage Sources"
+2. Click "Add Source" and enter:
+   - **Name**: Display name for the feed
+   - **URL**: RSS or Atom feed URL
+   - **Interval**: How often to check for updates (in milliseconds)
+3. Save and the feed will start polling automatically
+
+### Adding New Feed Parsers
+For developers wanting to add custom feed types:
+
+1. Create a new parser in `src-tauri/src/taps/`
+2. Implement the `Tap` trait:
+```rust
+#[async_trait::async_trait]
+impl Tap for CustomTap {
+    async fn fetch(&self, src: &SourceConfig) -> Result<Vec<NewsItem>> {
+        // Custom parsing logic here
+    }
+}
+```
+3. Register in `src-tauri/src/taps/mod.rs`
+4. Update the UI dropdown in `SourceManager.vue`
+
+### Customizing the Interface
+The design uses CSS custom properties for easy theming:
+
+```css
+:root {
+  --accent-primary: #007aff;     /* Primary accent color */
+  --bg-primary: #fafafa;         /* Main background */
+  --text-primary: #1d1d1f;       /* Primary text */
+  --border-light: #e5e5e7;       /* Light borders */
+  /* See src/assets/theme.css for all variables */
+}
+```
+
+## Default Sources
+
+FeedTap comes pre-configured with several cryptocurrency news sources:
+
+- **CryptoPanic** - Aggregated crypto news
+- **CoinDesk** - Bitcoin and blockchain news  
+- **Cointelegraph** - Cryptocurrency news and analysis
+- **Decrypt** - Web3 and crypto journalism
+- **The Block** - Institutional crypto news
+- **Bitcoin Magazine** - Bitcoin-focused content
+- **And several others**
+
+You can remove these and add your own sources for any topic (tech news, blogs, sports, etc.).
+
+## Troubleshooting
+
+### Common Issues
+
+**Application won't start:**
+- Ensure Node.js and Rust toolchain are installed
+- Try `npm install` to reinstall dependencies
+- Check that port 8787 is not already in use
+
+**Feeds not updating:**
+- Check your internet connection
+- Verify RSS/Atom URLs are valid and accessible
+- Some feeds may have rate limiting or access restrictions
+
+**Preview not working:**
+- Some websites block automated content fetching
+- Preview works best with standard article formats
+- CryptoPanic links are specially handled to extract source content
+
+**Performance issues:**
+- Reduce polling frequency for feeds you check less often
+- Use compact view mode for better performance with many articles
+- Clear browser cache if using development mode
+
+## License
+
+MIT License - see LICENSE file for details.

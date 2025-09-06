@@ -4,38 +4,30 @@ mod aggregator;
 mod ws;
 mod storage;
 
-use std::sync::Arc;
 use aggregator::AggregatorHandle;
-use tokio::sync::Mutex;
 use types::SourceConfig;
 use tauri::Manager;
 
 // Tauri commands for managing sources and triggering refresh
 #[tauri::command]
 async fn list_sources(state: tauri::State<'_, AppState>) -> Result<Vec<SourceConfig>, String> {
-    Ok(state.storage.lock().await.list_sources().await)
+    Ok(state.storage.list_sources())
 }
 
 #[tauri::command]
 async fn add_source(state: tauri::State<'_, AppState>, src: SourceConfig) -> Result<(), String> {
     state
         .storage
-        .lock()
-        .await
         .add_source(src)
-        .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| format!("Failed to add source: {}", e))
 }
 
 #[tauri::command]
 async fn remove_source(state: tauri::State<'_, AppState>, id: String) -> Result<(), String> {
     state
         .storage
-        .lock()
-        .await
         .remove_source(&id)
-        .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| format!("Failed to remove source: {}", e))
 }
 
 #[tauri::command]
@@ -49,7 +41,7 @@ async fn refresh_now(state: tauri::State<'_, AppState>, id: Option<String>) -> R
 
 struct AppState {
     aggregator: AggregatorHandle,
-    storage: Arc<Mutex<storage::Storage>>,
+    storage: storage::Storage,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -64,23 +56,18 @@ pub fn run() {
             let app_handle = app.handle().clone();
             let port = 8787u16;
 
-            let storage = Arc::new(Mutex::new(storage::Storage::new(app_handle.clone())));
-            let storage_clone = storage.clone();
+            let storage = storage::Storage::new(app_handle.clone());
 
-            // ensure default sources asynchronously
-            tauri::async_runtime::spawn({
-                let storage = storage_clone.clone();
-                async move {
-                    let mut st = storage.lock().await;
-                    let _ = st.ensure_default_sources().await;
-                }
-            });
+            // ensure default sources
+            if let Err(e) = storage.ensure_default_sources() {
+                eprintln!("Failed to ensure default sources: {}", e);
+            }
 
             // start aggregator and ws
-            let (aggregator, rx) = aggregator::Aggregator::start(storage_clone.clone());
+            let (aggregator, rx) = aggregator::Aggregator::start(storage.clone());
             ws::start_ws_server(port, rx);
 
-            app.manage(AppState { aggregator, storage: storage_clone });
+            app.manage(AppState { aggregator, storage });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
