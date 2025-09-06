@@ -122,9 +122,13 @@ fn extract_enhanced_summary(entry: &Entry) -> Option<String> {
         // Clean HTML tags and entities
         let cleaned = clean_html_content(content);
         
-        // Truncate to reasonable length for crypto news summaries
+        // Truncate to reasonable length for crypto news summaries, respecting UTF-8 boundaries
         if cleaned.len() > 500 {
-            format!("{}...", &cleaned[..497])
+            let mut truncate_at = 497;
+            while !cleaned.is_char_boundary(truncate_at) && truncate_at > 0 {
+                truncate_at -= 1;
+            }
+            format!("{}...", &cleaned[..truncate_at])
         } else {
             cleaned
         }
@@ -146,9 +150,13 @@ fn extract_crypto_enhanced_summary(entry: &Entry, source_id: &str) -> Option<Str
         // Extract price mentions for crypto relevance
         let price_mentions = super::crypto_feeds::crypto_utils::extract_price_mentions(&cleaned);
         
-        // Truncate and enhance for crypto content
+        // Truncate and enhance for crypto content, respecting UTF-8 boundaries
         let truncated = if cleaned.len() > 400 {
-            format!("{}...", &cleaned[..397])
+            let mut truncate_at = 397;
+            while !cleaned.is_char_boundary(truncate_at) && truncate_at > 0 {
+                truncate_at -= 1;
+            }
+            format!("{}...", &cleaned[..truncate_at])
         } else {
             cleaned
         };
